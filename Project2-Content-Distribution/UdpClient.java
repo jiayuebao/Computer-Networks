@@ -9,8 +9,8 @@ public class UdpClient {
         this.node = node;
     }
     public void go() throws IOException{
-        DatagramSocket dsock = new DatagramSocket();
         while (true) {
+            DatagramSocket dsock = new DatagramSocket();
             // input from the console
             Scanner scan = new Scanner(System.in);
             String request = scan.nextLine();

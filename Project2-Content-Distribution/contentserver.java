@@ -31,7 +31,8 @@ public class contentserver {
         node.setBackEndPort(Integer.valueOf(map.getOrDefault("backend_port", "18346")));
         node.setPeerCount(Integer.valueOf(map.getOrDefault("peer_count", "0")));
 
-        // Initialize neighbors
+
+        // Initialize neighbors/Metrics/heartbeat
         for (int i = 0; i < node.getPeerCount(); i++) {
             String[] info = map.get("peer_" + i).split(",");
             Node neighbor = new Node();
@@ -40,6 +41,7 @@ public class contentserver {
             neighbor.setBackEndPort(Integer.valueOf(info[2]));
             node.addNeighbors(info[0],neighbor);
             node.addMetrics(info[0], Integer.valueOf(info[3]));
+            node.addHeartBeat(info[0], new Date().getTime());
         }
         return node;
     }

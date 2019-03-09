@@ -6,7 +6,6 @@ public class Node {
     private String name;
     private String host;
     private int backEndPort;
-    private int frontEndPort;
     private int peerCount;
     private Map<String, Integer> metrics; // uuid : distance
     private Map<String, Long> heartBeat;
@@ -17,7 +16,6 @@ public class Node {
         name = "not-specified";
         host = "not-specified";
         backEndPort = 18346;
-        frontEndPort = 18345;
         peerCount = 0;
         metrics = new HashMap<>();
         heartBeat = new HashMap<>();
@@ -38,10 +36,6 @@ public class Node {
 
     public void setBackEndPort(int port) {
         this.backEndPort = port;
-    }
-
-    public void setFrontEndPort(int port) {
-        this.frontEndPort = port;
     }
 
     public void setPeerCount(int count) {
@@ -74,10 +68,6 @@ public class Node {
 
     public int getBackEndPort() {
         return this.backEndPort;
-    }
-
-    public int getFrontEndPort() {
-        return this.frontEndPort;
     }
 
     public int getPeerCount() {
