@@ -1,6 +1,7 @@
-import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.PriorityBlockingQueue;
 import org.json.*;
  
 public class UdpServer {
@@ -9,23 +10,23 @@ public class UdpServer {
 	Map<String, String> nameTable; // uuid : name
 	long sequence = 0;
 
-	public UdpServer(Node node) {
+	public UdpServer(Node node, String nodeName) {
 		this.node = node; // init node
 		// init linkMap
-		linkMap = new HashMap<>();
+		linkMap = new ConcurrentHashMap<>();
 		Advertisement initAd = new Advertisement(sequence++, node.getMetrics());
 		linkMap.put(node.getUuid(), initAd);
 		// init nameTable
-		nameTable = new HashMap<>();
-		nameTable.put(node.getUuid(), node.getName());
+		nameTable = new ConcurrentHashMap<>();
+		nameTable.put(node.getUuid(), nodeName);
 		for (String uuid : node.getNeighbors().keySet()) {
-			nameTable.put(uuid, node.getNeighbors().get(uuid).getName());
+			nameTable.put(uuid, "not-specified");
 		}
 	}
 
 	/**
-	 *
-	 * @return JSONObject
+	 * Handler for "uuid".
+	 * @return the uuid of the current node
 	 * @throws Exception
 	 */
 	public String uuidHandler() throws Exception {
@@ -35,8 +36,8 @@ public class UdpServer {
 	}
 
 	/**
-	 *
-	 * @return
+	 * Handler for "neighbors".
+	 * @return a list of objects representing all active neighbor
 	 * @throws Exception
 	 */
 	public String neighborsHandler() throws Exception {
@@ -47,7 +48,7 @@ public class UdpServer {
 		for (Node neighbor : neighbors.values()) {
 			JSONObject obj = new JSONObject();
 			obj.put("uuid", neighbor.getUuid());
-			obj.put("name", neighbor.getName());
+			obj.put("name", nameTable.get(neighbor.getUuid()));
 			obj.put("host", neighbor.getHost());
 			obj.put("backend", neighbor.getBackEndPort());
 			obj.put("metric", metric.get(neighbor.getUuid()));
@@ -57,9 +58,11 @@ public class UdpServer {
 	}
 
 	/**
-	 *
+	 * Handler for "addneighbor".
+	 * Add the given node with the given uuid, backend port, and distance metric
+	 * as new neighbor.
 	 * @param message
-	 * @return
+	 * @return  success information
 	 */
 	public String addNeighborHandler(String message) {
 		String[] fields = new String[] {"uuid=", "host=", "backend=", "metric="};
@@ -85,8 +88,10 @@ public class UdpServer {
 	}
 
 	/**
-	 *
-	 * @return
+	 * Handler for "map".
+	 * Output the latest network map only containing active node.
+	 * The object’s field name is node’s name (by default) or UUID (if a node name was not specified.)
+	 * @return an object representing an adjacency list for the latest network map
 	 * @throws Exception
 	 */
 	public String mapHandler() throws Exception {
@@ -95,48 +100,45 @@ public class UdpServer {
 			Map<String, Integer> metrics = linkMap.get(sourceId).getMetrics();
 			JSONObject obj2 = new JSONObject();
 			for (String  neighborId : metrics.keySet()) {
-				String name = nameTable.get(neighborId);
-				if (name == null || name.equals("not-specified")) {
-					name = neighborId;
-				}
+				String name = getName(neighborId);
 				obj2.put(name, metrics.get(neighborId));
 			}
-			String sourceName = nameTable.get(sourceId);
-			if (sourceName == null || sourceName.equals("not-specified")) {
-				sourceName = sourceId;
-			}
+			String sourceName = getName(sourceId);
 			obj.put(sourceName, obj2);
 		}
 		return obj.toString();
 	}
 
+	/**
+	 * Handler for "rank".
+	 * @return an ordered list (sorted by distance metrics) showing the distance between the requested nodes.
+	 * @throws Exception
+	 */
 	public String rankHandler() throws Exception {
-
 		JSONArray array = new JSONArray();
-		PriorityQueue<GraphNode> pq = new PriorityQueue<>((n1, n2) -> (n1.distance - n2.distance));
-		Set<String> visited = new HashSet<>();
 
+		PriorityQueue<GraphNode> pq = new PriorityQueue<>((n1, n2)
+				-> (Integer.compare(n1.getDistance(), n2.getDistance())));
+		Set<String> visited = new HashSet<>();
+		visited.add(node.getUuid());
 		for (String uuid : this.node.getMetrics().keySet()) {
 			GraphNode curr = new GraphNode(uuid, this.node.getMetrics().get(uuid));
 			pq.offer(curr);
-			visited.add(uuid);
 		}
 
 		while (!pq.isEmpty()) {
 			JSONObject obj = new JSONObject();
 			GraphNode top = pq.poll();
-			String name = nameTable.get(top.uuid);
-			if (name == null || name.equals("not-specified")) {
-				name = top.uuid;
-			}
-			obj.put(name, top.getDistance());
-			array.put(obj);
+			if (visited.contains(top.getUuid())) continue;
 			visited.add(top.getUuid());
+			obj.put(getName(top.getUuid()), top.getDistance());
+			//System.out.println(obj.toString());
+			array.put(obj);
 
 			if (linkMap.containsKey(top.getUuid())) {
 				Map<String, Integer> metrics = linkMap.get(top.getUuid()).getMetrics();
 				for (String uuid : metrics.keySet()) {
-					if (!visited.add(uuid)) {
+					if (!visited.contains(uuid)) {
 						GraphNode newNeighbor = new GraphNode(uuid,
 								top.getDistance() + metrics.get(uuid));
 						pq.offer(newNeighbor);
@@ -148,26 +150,50 @@ public class UdpServer {
 		return array.toString();
 	}
 
-	public String heartBeatHandler(String receiveMessage) throws Exception {
+	/**
+	 * Handler for heartbeat.
+	 * Receive the heartbeat information from neighbors.
+	 * @param receiveMessage
+	 * @return success information
+	 * @throws Exception
+	 */
+	public String heartBeatHandler(String receiveMessage,DatagramPacket dpack) throws Exception {
 		String[] message = receiveMessage.split(",");
 		String uuid = message[1];
 		String name = message[2];
 		long sentTime = Long.valueOf(message[3]);
 		Map<String, Node> neighbors = node.getNeighbors();
 		Map<String, Long> heartBeats = node.getHeartBeat();
-		if (neighbors.containsKey(uuid)) {
-			Node neighbor = neighbors.get(uuid);
-			if (neighbor.getName().equals("not-specified")){
-				neighbor.setName(name);
+		Map<String, Integer> metrics = node.getMetrics();
+
+		if (heartBeats.containsKey(uuid)) {
+			if (heartBeats.get(uuid) < sentTime) {
+				heartBeats.put(uuid, sentTime);
 			}
+		} else { // a new neighbor
+			int distance = Integer.valueOf(message[4]);
+			Node neighbor = new Node();
+			neighbor.setUuid(uuid);
+			neighbor.setBackEndPort(dpack.getPort());
+			neighbor.setHost(dpack.getAddress().getHostName());
 			neighbors.put(uuid, neighbor);
+			metrics.put(uuid, distance);
 			heartBeats.put(uuid, sentTime);
 		}
+
 		updateNameTable(uuid, name);
-		System.out.println("Received heartbeat from " + uuid + ":" + name + " at " + sentTime);
-		return "Received Heart Beat from " + uuid + ":" + name;
+		return "Received Heart Beat from " + name + " at " + sentTime;
 	}
 
+	/**
+	 * Send heartbeat information to its neighbors per 10 seconds.
+	 * At the same time check if a neighbor is inactive (not send heartbeat for more than 30 seconds),
+	 * if not, remove it.
+	 * Heart beat information format is:
+	 * "heartbeat, rootUuid, rootName, currentTime, distance"
+	 * @param dsock
+	 * @throws Exception
+	 */
 	public void sendHeartBeat(DatagramSocket dsock) throws Exception {
 		TimerTask heartBeatTask = new TimerTask() {
 			@Override
@@ -176,10 +202,9 @@ public class UdpServer {
 				StringBuilder builder = new StringBuilder();
 				builder.append("heartbeat,");
 				builder.append(node.getUuid() + ",");
-				builder.append(node.getName() + ",");
-				builder.append(currTime);
-				String message = builder.toString();
-				byte[] bytes = message.getBytes();
+				builder.append(nameTable.get(node.getUuid()) + ",");
+				builder.append(currTime + ",");
+
 				Map<String, Node> neighbors = node.getNeighbors();
 				Map<String, Long> heartBeat = node.getHeartBeat();
 				Map<String, Integer> metrics = node.getMetrics();
@@ -192,54 +217,76 @@ public class UdpServer {
 					}
 					// send heartbeat
 					try {
+						StringBuilder builder2 = new StringBuilder(builder);
+						builder2.append(node.getMetrics().get(uuid));
+						String message = builder2.toString();
+						byte[] bytes = message.getBytes();
 						Node neighbor = neighbors.get(uuid);
 						DatagramPacket hbpack = new DatagramPacket(bytes,
 								bytes.length,
 								InetAddress.getByName(neighbor.getHost()),
 								neighbor.getBackEndPort());
 						dsock.send(hbpack);
-						System.out.println("Sent heartbeat to " + uuid + " at " + currTime);
+						System.out.println("Sent heartbeat to " + nameTable.get(uuid) + " at " + currTime);
 					} catch(Exception e) {
 						e.printStackTrace();
 					}
 				}
+				// remove the inactive
 				neighbors.keySet().removeAll(inactive);
 				metrics.keySet().removeAll(inactive);
 				heartBeat.keySet().removeAll(inactive);
-
-				System.out.println("Sent heartbeat at " + currTime);
 			}
 		};
 		Timer timer = new Timer();
 		timer.schedule(heartBeatTask, 0,1000*10);
 	}
 
+
+	/**
+	 * Periodically send advertisement (neighbor metric) to the neighbors.
+	 * The advertisement format is:
+	 * "advertisementsequence : rootUuid, rootName; neighbor1Uuid, neighbor1Name, neighbor1Dist;..."
+	 * @param dsock
+	 */
 	public void sendAdvertisement(DatagramSocket dsock)  {
 		TimerTask advertisementTask = new TimerTask() {
 			@Override
 			public void run() {
 				StringBuilder builder = new StringBuilder();
+				builder.append("advertisement");
 				builder.append(sequence + ":");
-				builder.append(node.getUuid() + "," + node.getName());
+				builder.append(node.getUuid() + "," + nameTable.get(node.getUuid()));
 				for (String neighborId : node.getNeighbors().keySet()) {
 					builder.append(";");
 					builder.append(neighborId + ",");
-					builder.append(node.getNeighbors().get(neighborId).getName() + ",");
+					builder.append(nameTable.get(neighborId) + ",");
 					builder.append(node.getMetrics().get(neighborId));
 				}
 				sequence++;
 				try {
-					forward(builder.toString(), dsock);
+					forward(builder.toString(), dsock, node.getUuid());
 				} catch(Exception e) {
 					e.printStackTrace();
 				}
+				//System.out.println("Send advertisement: " + builder.toString());
 			}
 		};
 		Timer timer = new Timer();
 		timer.schedule(advertisementTask, 0,1000*10);
 	}
 
-	public String advertisementHandler(String message, DatagramSocket dsock) throws Exception{
+	/**
+	 * Receive the advertisement from the other nodes.
+	 * Then forward the message to its neighbors.
+	 * @param message
+	 * @param dsock
+	 * @return success information
+	 * @throws Exception
+	 */
+	public String advertisementHandler(String message, DatagramSocket dsock) throws Exception {
+		// decode the heartbeat message
+		message = message.substring("advertisement".length());
 		int index1 = message.indexOf(":");
 		long sequence = Long.valueOf(message.substring(0, index1));
 		message = message.substring(index1+1);
@@ -251,7 +298,7 @@ public class UdpServer {
 			// update linkMap
 			Map<String, Integer> metrics = new HashMap<>();
 			for (int i = 1; i < nodes.length; i++) {
-				String[] neighborInfo = nodes[i].split(",");
+				String[] neighborInfo = nodes[i].split(","); // uuid, name, distance
 				updateNameTable(neighborInfo[0], neighborInfo[1]);
 				metrics.put(neighborInfo[0], Integer.valueOf(neighborInfo[2]));
 			}
@@ -260,14 +307,21 @@ public class UdpServer {
 		}
 
 		// forward the message to all its neighbors
-		forward(message, dsock);
-		return "Get an advertisement from " + rootInfo[0] + " : " + rootInfo[1];
+		forward(message, dsock, rootInfo[0]);
+		return "Get an advertisement from " + rootInfo[1];
 	}
 
 
-	public void forward(String message, DatagramSocket dsock) throws Exception{
+	/**
+	 * Forward the message to all the neighbor node except the excluded neighbor.
+	 * @param message
+	 * @param dsock
+	 * @throws Exception
+	 */
+	public void forward(String message, DatagramSocket dsock, String excludeId) throws Exception{
 		byte[] bytes = message.getBytes();
 		for (String uuid : node.getNeighbors().keySet()) {
+			if (uuid.equals(excludeId)) continue;
 			Node neighbor = node.getNeighbors().get(uuid);
 			DatagramPacket packet = new DatagramPacket(bytes,
 					bytes.length,
@@ -277,18 +331,41 @@ public class UdpServer {
 		}
 	}
 
+	/**
+	 * Update the name table if the uuid is not exist or the name is not specified.
+	 * @param uuid
+	 * @param name
+	 */
 	public void updateNameTable(String uuid, String name) {
 		if (!nameTable.containsKey(uuid) || nameTable.get(uuid).equals("not-specified")) {
 			nameTable.put(uuid, name);
 		}
 	}
 
+	/**
+	 * Check the nameTable to get the node name according to uuid.
+	 * @param uuid
+	 * @return node name
+	 */
+	public String getName(String uuid) {
+		String name = nameTable.get(uuid);
+		if (name == null || name.equals("not-specified")) {
+			name = uuid;
+		}
+		return name;
+	}
+
+	/**
+	 * Receive the request from the console and use corresponding to handle the request.
+	 * Print the response on the screen.
+	 * @throws Exception
+	 */
 	public void go() throws Exception {
 		DatagramSocket dsock = new DatagramSocket(node.getBackEndPort());
-		DatagramPacket dpack = new DatagramPacket(new byte[150], 150);
+		DatagramPacket dpack = new DatagramPacket(new byte[1500], 1500);
 		node.setHost(InetAddress.getLocalHost().getHostName());
-		//sendHeartBeat(dsock);
-		//sendAdvertisement(dsock);
+		sendHeartBeat(dsock);
+		sendAdvertisement(dsock);
 		while(true) {
 			// receive the packet
 			dsock.receive(dpack);
@@ -309,7 +386,7 @@ public class UdpServer {
 			} else if (receivedMsg.equals("kill")) {
 				System.exit(0);
 			} else if (receivedMsg.startsWith("heartbeat")) {
-				response = heartBeatHandler(receivedMsg);
+				response = heartBeatHandler(receivedMsg, dpack);
 			} else if (receivedMsg.startsWith("advertisement")) {
 				response = advertisementHandler(receivedMsg, dsock);
 			}

@@ -2,8 +2,7 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
-public class contentserver {
-
+public class Contentserver {
     public Map<String, String> readConf(String fileName) {
         File file = new File(fileName);
         Map<String, String> map = new HashMap<String, String>();
@@ -27,13 +26,11 @@ public class contentserver {
         // Initialize Node
         Node node = new Node();
         node.setUuid(map.getOrDefault("uuid", "not-specified"));
-        node.setName(map.getOrDefault("name", "not-specified"));
         node.setBackEndPort(Integer.valueOf(map.getOrDefault("backend_port", "18346")));
-        node.setPeerCount(Integer.valueOf(map.getOrDefault("peer_count", "0")));
-
+        int peerCount = Integer.valueOf(map.getOrDefault("peer_count", "0"));
 
         // Initialize neighbors/Metrics/heartbeat
-        for (int i = 0; i < node.getPeerCount(); i++) {
+        for (int i = 0; i < peerCount; i++) {
             String[] info = map.get("peer_" + i).split(",");
             Node neighbor = new Node();
             neighbor.setUuid(info[0]);
@@ -65,10 +62,10 @@ public class contentserver {
     }
 
     public static void main(String[] args) throws IOException{
-        contentserver server = new contentserver();
+        Contentserver server = new Contentserver();
         Map<String, String> parameters = server.readConf(args[1]);
         Node node = server.createNode(parameters);
-
+        String nodeName = parameters.getOrDefault("name", "not-specified");
         if (node.getUuid().equals("not-specified")) {
             node.setUuid(UUID.randomUUID().toString());
             server.updateConf(args[1], node.getUuid());
@@ -77,7 +74,7 @@ public class contentserver {
         Thread serverThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                UdpServer udpServer = new UdpServer(node);
+                UdpServer udpServer = new UdpServer(node, nodeName);
                 try {
                     udpServer.go();
                 } catch (Exception e) {
@@ -89,7 +86,7 @@ public class contentserver {
         Thread clientThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                UdpClient udpClient = new UdpClient(node);
+                UdpClient udpClient = new UdpClient(node.getBackEndPort());
                 try {
                     udpClient.go();
                 } catch (Exception e) {

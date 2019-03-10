@@ -1,34 +1,30 @@
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.json.*;
 
 public class Node {
     private String uuid;
-    private String name;
     private String host;
     private int backEndPort;
-    private int peerCount;
+    //private int peerCount;
     private Map<String, Integer> metrics; // uuid : distance
     private Map<String, Long> heartBeat;
     private Map<String, Node> neighbors; // uuid : node
 
     public Node() {
         uuid = "not-specified";
-        name = "not-specified";
         host = "not-specified";
         backEndPort = 18346;
-        peerCount = 0;
-        metrics = new HashMap<>();
-        heartBeat = new HashMap<>();
-        neighbors = new HashMap<>();
+        metrics = new ConcurrentHashMap<>();
+        heartBeat = new ConcurrentHashMap<>();
+        neighbors = new ConcurrentHashMap<>();
     }
 
     public void setUuid(String id) {
         this.uuid = id;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
 
     public void setHost(String host) {
         this.host = host;
@@ -36,10 +32,6 @@ public class Node {
 
     public void setBackEndPort(int port) {
         this.backEndPort = port;
-    }
-
-    public void setPeerCount(int count) {
-        this.peerCount = count;
     }
 
     public void addNeighbors(String uuid, Node node) {
@@ -58,10 +50,6 @@ public class Node {
         return this.uuid;
     }
 
-    public String getName() {
-        return this.name;
-    }
-
     public String getHost() {
         return this.host;
     }
@@ -70,9 +58,6 @@ public class Node {
         return this.backEndPort;
     }
 
-    public int getPeerCount() {
-        return this.peerCount;
-    }
 
     public Map<String, Integer> getMetrics() {
         return this.metrics;

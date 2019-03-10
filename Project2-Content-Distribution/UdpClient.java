@@ -4,9 +4,9 @@ import java.util.*;
 import org.json.*;
   
 public class UdpClient {
-    Node node;
-    public UdpClient(Node node) {
-        this.node = node;
+    int backEndport;
+    public UdpClient(int port) {
+        this.backEndport = port;
     }
     public void go() throws IOException{
         while (true) {
@@ -20,7 +20,7 @@ public class UdpClient {
             DatagramPacket dpack = new DatagramPacket(bytes,
                     bytes.length,
                     InetAddress.getByName("localhost"),
-                    node.getBackEndPort());
+                    this.backEndport);
             dsock.send(dpack);
 
             // receive the packet
