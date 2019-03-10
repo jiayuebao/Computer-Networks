@@ -83,7 +83,7 @@ public class UdpServer {
 		node.addNeighbors(uuid, neighbor);
 		node.addMetrics(uuid, Integer.valueOf(message.substring(startIdx[3], endIdx[3])));
 		node.addHeartBeat(uuid, new Date().getTime());
-
+		updateNameTable(uuid, "not-specified");
 		return "Successfully add Neighbor: " + uuid;
 	}
 
@@ -227,7 +227,7 @@ public class UdpServer {
 								InetAddress.getByName(neighbor.getHost()),
 								neighbor.getBackEndPort());
 						dsock.send(hbpack);
-						System.out.println("Sent heartbeat to " + nameTable.get(uuid) + " at " + currTime);
+						//System.out.println("Sent heartbeat to " + nameTable.get(uuid) + " at " + currTime);
 					} catch(Exception e) {
 						e.printStackTrace();
 					}
@@ -236,6 +236,7 @@ public class UdpServer {
 				neighbors.keySet().removeAll(inactive);
 				metrics.keySet().removeAll(inactive);
 				heartBeat.keySet().removeAll(inactive);
+				//nameTable.keySet().removeAll(inactive);
 			}
 		};
 		Timer timer = new Timer();
@@ -270,6 +271,7 @@ public class UdpServer {
 					e.printStackTrace();
 				}
 				//System.out.println("Send advertisement: " + builder.toString());
+				System.out.println(Arrays.toString(nameTable.entrySet().toArray()));
 			}
 		};
 		Timer timer = new Timer();
@@ -285,6 +287,7 @@ public class UdpServer {
 	 * @throws Exception
 	 */
 	public String advertisementHandler(String message, DatagramSocket dsock) throws Exception {
+		String origin = message;
 		// decode the heartbeat message
 		message = message.substring("advertisement".length());
 		int index1 = message.indexOf(":");
@@ -294,6 +297,7 @@ public class UdpServer {
 		String[] rootInfo = nodes[0].split(","); // uuid, name
 		updateNameTable(rootInfo[0], rootInfo[1]);
 		Advertisement prev = linkMap.get(rootInfo[0]);
+
 		if (prev == null || prev.getSequence() < sequence) {
 			// update linkMap
 			Map<String, Integer> metrics = new HashMap<>();
@@ -304,10 +308,10 @@ public class UdpServer {
 			}
 			Advertisement curr = new Advertisement(sequence, metrics);
 			linkMap.put(rootInfo[0], curr);
+			// forward the message to all its neighbors
+			forward(origin, dsock, rootInfo[0]);
 		}
 
-		// forward the message to all its neighbors
-		forward(message, dsock, rootInfo[0]);
 		return "Get an advertisement from " + rootInfo[1];
 	}
 
@@ -337,7 +341,7 @@ public class UdpServer {
 	 * @param name
 	 */
 	public void updateNameTable(String uuid, String name) {
-		if (!nameTable.containsKey(uuid) || nameTable.get(uuid).equals("not-specified")) {
+		if (!nameTable.containsKey(uuid) || !name.equals("not-specified")) {
 			nameTable.put(uuid, name);
 		}
 	}
