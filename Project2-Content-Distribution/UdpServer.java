@@ -1,7 +1,6 @@
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.PriorityBlockingQueue;
 import org.json.*;
  
 public class UdpServer {
@@ -90,7 +89,7 @@ public class UdpServer {
 	/**
 	 * Handler for "map".
 	 * Output the latest network map only containing active node.
-	 * The object’s field name is node’s name (by default) or UUID (if a node name was not specified.)
+	 * The object's field name is node's name (by default) or UUID (if a node name was not specified.)
 	 * @return an object representing an adjacency list for the latest network map
 	 * @throws Exception
 	 */
@@ -132,7 +131,6 @@ public class UdpServer {
 			if (visited.contains(top.getUuid())) continue;
 			visited.add(top.getUuid());
 			obj.put(getName(top.getUuid()), top.getDistance());
-			//System.out.println(obj.toString());
 			array.put(obj);
 
 			if (linkMap.containsKey(top.getUuid())) {
@@ -263,6 +261,7 @@ public class UdpServer {
 					builder.append(neighborId + ",");
 					builder.append(nameTable.get(neighborId) + ",");
 					builder.append(node.getMetrics().get(neighborId));
+					//System.out.println("Sent advertisement" + sequence + " to " + neighborId);
 				}
 				sequence++;
 				try {
@@ -270,8 +269,6 @@ public class UdpServer {
 				} catch(Exception e) {
 					e.printStackTrace();
 				}
-				//System.out.println("Send advertisement: " + builder.toString());
-				System.out.println(Arrays.toString(nameTable.entrySet().toArray()));
 			}
 		};
 		Timer timer = new Timer();
@@ -390,9 +387,9 @@ public class UdpServer {
 			} else if (receivedMsg.equals("kill")) {
 				System.exit(0);
 			} else if (receivedMsg.startsWith("heartbeat")) {
-				response = heartBeatHandler(receivedMsg, dpack);
+				heartBeatHandler(receivedMsg, dpack);
 			} else if (receivedMsg.startsWith("advertisement")) {
-				response = advertisementHandler(receivedMsg, dsock);
+				advertisementHandler(receivedMsg, dsock);
 			}
 
 			// send the packet
@@ -402,7 +399,7 @@ public class UdpServer {
 //					InetAddress.getByName("localhost"),
 //					node.getFrontEndPort());
 //			dsock.send(dpack);
-			System.out.println(response);
+			if (!response.equals("")) System.out.println(response);
 		}
 	}
 }
