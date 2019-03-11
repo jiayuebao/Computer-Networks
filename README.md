@@ -22,10 +22,6 @@ Put the node configuration file under the same directory of contentserver.sh, an
 - **kill**: terminate the program
 
 ### Design and Implementation 
-#### Three main Java classes
-- **Contentserver**: main method entry, dealing with node initialization and creating 2 threads to deal with UDP requests and UDP responses. 
-- **UdpServer**: core part, handle request URI from UDP client, send heartbeat to neighbors and receive heartbeat from neighbors, send advertisement to neighbors, receive advertisement from other nodes and forward the received advertisement to the neighbors. It maintains its **current node**, a **name table** of all network nodes and a **network topology map**. 
-- **UdpClient**: create UDP requests, waiting for the console input and send the request URI to UDP server.
 
 #### Node
 Node class is created to represent a node (i.e., a computer) in the network. A Node is initialized in Contentserver.java and is maintained in UdpServer.java.Each Node has uuid, host and backEndPort and three tables to record its neighbors’ information:
