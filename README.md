@@ -47,11 +47,11 @@ The routing table is created by finding the shortest path of each node to the cu
 
 ### Test Results
 1.	There is only one node1 and node2 in the network, so node3(previous neighbor of node1) will disappear after a while.
-<img src="https://github.com/jiayuebao/Computer-Networks/blob/master/Project2-Content-Distribution/pictures/running1.png" width=70%, height=70%>
+<img src="https://github.com/jiayuebao/Computer-Networks/blob/master/Content-Distribution-Network/pictures/running1.png" width=70%, height=70%>
 
 2.	Node1 added node4 as a new neighbor.
-<img src="https://github.com/jiayuebao/Computer-Networks/blob/master/Project2-Content-Distribution/pictures/running-node1.png" width=70%, height=70%>
+<img src="https://github.com/jiayuebao/Computer-Networks/blob/master/Content-Distribution-Network/pictures/running-node1.png" width=70%, height=70%>
 
 3.	Node4 previously does not have any neighbors, but after a while, it will recognize node1 as its neighbor. Furthermore, it will also realize the existence of node2. And so does node2.
-<img src="https://github.com/jiayuebao/Computer-Networks/blob/master/Project2-Content-Distribution/pictures/running-node2.png" width=70%, height=70%>
-<img src="https://github.com/jiayuebao/Computer-Networks/blob/master/Project2-Content-Distribution/pictures/running-node4.png" width=70%, height=70%>
+<img src="https://github.com/jiayuebao/Computer-Networks/blob/master/Content-Distribution-Network/pictures/running-node2.png" width=70%, height=70%>
+<img src="https://github.com/jiayuebao/Computer-Networks/blob/master/Content-Distribution-Network/pictures/running-node4.png" width=70%, height=70%>
