@@ -4,10 +4,15 @@ import java.util.*;
 import java.io.*;
 
 public class HttpResponse {
+    boolean abTest = true;
     public String getHeader(boolean connect, int fileLen, int contentLen, String contentRange,
                             String uri, long lastModified) {
         StringBuilder builder = new StringBuilder();
-        builder.append("Connection: ").append(connect ? "Keep-Alive" : "Close").append("\r\n");
+        if (abTest) {
+            builder.append("Connection: Keep-Alive\r\n");
+        } else {
+            builder.append("Connection: ").append(connect ? "Keep-Alive" : "Close").append("\r\n");
+        }
         builder.append("Accept-Ranges: bytes\r\n");
         builder.append("Content-Length: ").append(contentLen).append("\r\n");
         builder.append("Content-Range: bytes ").append(contentRange).append("/").append(fileLen).append("\r\n");
@@ -21,7 +26,11 @@ public class HttpResponse {
     public String getHeader404(boolean connect, int fileLen) {
         StringBuilder builder = new StringBuilder();
         builder.append("HTTP/1.1 404 Not Found\r\n");
-        builder.append("Connection: ").append(connect ? "Keep-Alive" : "Close").append("\r\n");
+        if (abTest) {
+            builder.append("Connection: Keep-Alive\r\n");
+        } else {
+            builder.append("Connection: ").append(connect ? "Keep-Alive" : "Close").append("\r\n");
+        }
         builder.append("Date: ").append(getFormattedDate(new Date())).append("\r\n");
         builder.append("Content-Type: text/html\r\n");
         builder.append("Content-Length: ").append(fileLen).append("\r\n");
@@ -45,7 +54,11 @@ public class HttpResponse {
     public String getHeader500() {
         StringBuilder builder = new StringBuilder();
         builder.append("HTTP/1.1 500 Internal Server Error\r\n");
-//        builder.append("Connection: Close").append("\r\n");
+        if (abTest) {
+            builder.append("Connection: Keep-Alive\r\n");
+        } else {
+            builder.append("Connection: Close\r\n");
+        }
         builder.append("\r\n");
         return builder.toString();
     }

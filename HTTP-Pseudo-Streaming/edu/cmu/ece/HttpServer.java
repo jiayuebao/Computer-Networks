@@ -1,22 +1,22 @@
 package edu.cmu.ece;
 
-import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
-
 import java.net.*;
 import java.io.*;
 import java.util.*;
 
 public class HttpServer implements Runnable {
-    static final File ROOT_DIR = new File("content");
-    static final int MAX_BUF_SIZE = 1 << 10;
+    private static final File ROOT_DIR = new File("content");
+    private static final int MAX_BUF_SIZE = 1 << 10;
+    private final int id;
     private Socket clientSocket;
-    boolean verbose = false;
-    HttpResponse response = new HttpResponse();
-    BufferedReader in = null;
-    PrintWriter textOut = null;
-    BufferedOutputStream binaryOut = null;
-    boolean conn = true;
-    int id;
+    private HttpResponse response = new HttpResponse();
+    private BufferedReader in = null;
+    private PrintWriter textOut = null;
+    private BufferedOutputStream binaryOut = null;
+    private boolean conn = true;
+    private int transmission = 0; // number of transmission
+    private boolean verbose = true;
+
     public HttpServer(Socket socket, int id) {
         clientSocket = socket;
         this.id = id;
@@ -24,7 +24,6 @@ public class HttpServer implements Runnable {
 
     @Override
     public void run() {
-        System.out.println("Client id: " + id);
         while (conn) {
             try {
                 in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -32,6 +31,7 @@ public class HttpServer implements Runnable {
                 binaryOut = new BufferedOutputStream(clientSocket.getOutputStream());
                 String inputLine = null;
                 while ( (inputLine = in.readLine())!= null) {
+                    transmission += 1;
                     doit(inputLine);
                 }
             } catch (IOException e) {
@@ -40,15 +40,33 @@ public class HttpServer implements Runnable {
             }
         }
         cleanUp();
+        VodServer.clients.remove(id);
+        if (verbose) {
+            String str = String.format("========= Client %d Close (%d) ============", id, transmission);
+            System.out.println(str);
+        }
     }
 
     private void doit(String requestLine) {
+        String verbResponse = String.format("-------[Client %d] Response (%d) --------\n", id, transmission);
+        String verbRequest = String.format("-------[Client %d] Request (%d) --------\n", id, transmission);
+        if (verbose) {
+            System.out.println(String.format("========= Client %d Start (%d) ============", id, transmission));
+        }
         try {
             Map<String, String> request = parse(in, requestLine);
-            if (verbose) System.out.println("-------Response--------");
-
+            if (verbose) {
+                StringBuilder builder = new StringBuilder();
+                for (Map.Entry<String, String> entry : request.entrySet()) {
+                    builder.append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+                }
+                System.out.println(verbRequest + builder.toString());
+            }
+            // check method
             if (!request.get("method").equals("get")) {
-                if (verbose) System.out.println("Not GET method!");
+                if (verbose) {
+                    System.out.println(verbResponse + "Not GET method!");
+                }
                 throw new IOException();
             }
             // check connection status
@@ -100,7 +118,7 @@ public class HttpServer implements Runnable {
             textOut.write(header);
             textOut.flush();
             if (verbose) {
-                System.out.println(header);
+                System.out.println(verbResponse + header);
             }
 
             // write binary file data
@@ -120,18 +138,21 @@ public class HttpServer implements Runnable {
         } catch (FileNotFoundException e) {
             String header404 = handle404(conn);
             if (verbose) {
-                System.err.println("404 Error File not exist!");
-                System.out.println(header404);
+                System.out.println(verbResponse + header404);
             }
         } catch (SocketException e) {
             conn = false;
-            System.err.println("Socket error: " + e.getMessage());
+            System.err.println("[Client " + id + " (" + transmission + ")" + "] Socket error: " + e.getMessage());
         } catch (IOException e) {
             conn = false;
             String header500 = handle500();
-            System.err.println("500 Server error: " + e.getMessage());
+            System.err.println("[Client " + id + " (" + transmission + ")" + "] 500 Server error: " + e.getMessage());
             if (verbose) {
-                System.out.println(header500);
+                System.out.println(verbResponse + header500);
+            }
+        } finally {
+            if (verbose) {
+                System.out.println(String.format("========= Client %d Finish (%d) ============", id, transmission));
             }
         }
     }
@@ -168,12 +189,7 @@ public class HttpServer implements Runnable {
                 map.put(tokens[0].toLowerCase(), tokens[1].trim().toLowerCase());
             }
         }
-        if (verbose) {
-            System.out.println("-------Request---------");
-            for (Map.Entry<String, String> entry : map.entrySet()) {
-                System.out.println(entry.getKey() + ": " + entry.getValue());
-            }
-        }
+
         return map;
     }
 
@@ -197,15 +213,14 @@ public class HttpServer implements Runnable {
 
     private void cleanUp() {
         try {
+//            textOut.println("Connection: Close");
             in.close();
             textOut.close();
             binaryOut.close();
             clientSocket.close();
-            if (verbose) {
-                System.out.println("Close client socket.");
-            }
         } catch (IOException e) {
             System.err.println("Close stream error.");
         }
     }
+
 }
