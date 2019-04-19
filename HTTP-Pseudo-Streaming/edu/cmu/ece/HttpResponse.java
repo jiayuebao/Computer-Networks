@@ -4,17 +4,16 @@ import java.util.*;
 import java.io.*;
 
 public class HttpResponse {
-    public String getHeader(boolean connect, int fileLen,
-                                      String range, String uri, long lastModified) {
+    public String getHeader(boolean connect, int fileLen, int contentLen, String contentRange,
+                            String uri, long lastModified) {
         StringBuilder builder = new StringBuilder();
-        builder.append("Accept-Ranges: bytes\r\n");
         builder.append("Connection: ").append(connect ? "Keep-Alive" : "Close").append("\r\n");
-        builder.append("Content-Length: ").append(fileLen).append("\r\n");
-        builder.append("Content-Range: ").append(range).append("\r\n");
+        builder.append("Accept-Ranges: bytes\r\n");
+        builder.append("Content-Length: ").append(contentLen).append("\r\n");
+        builder.append("Content-Range: bytes ").append(contentRange).append("/").append(fileLen).append("\r\n");
         builder.append("Content-Type: ").append(getContentType(uri)).append("\r\n");
         builder.append("Date: ").append(getFormattedDate(new Date())).append("\r\n");
         builder.append("Last-Modified: ").append(getFormattedDate(new Date(lastModified))).append("\r\n");
-        builder.append("ranges-specifier = byte-ranges-specifier\r\n");
         builder.append("\r\n");
         return builder.toString();
     }
@@ -43,6 +42,14 @@ public class HttpResponse {
                 "</html>";
     }
 
+    public String getHeader500() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("HTTP/1.1 500 Internal Server Error\r\n");
+//        builder.append("Connection: Close").append("\r\n");
+        builder.append("\r\n");
+        return builder.toString();
+    }
+
     public String getPage500() {
         return "<html lang=\"en\">\n" +
                 "<head>\n" +
@@ -54,12 +61,6 @@ public class HttpResponse {
                 "    <p>Oops...Something is wrong!</p>\n" +
                 "</body>\n" +
                 "</html>";
-    }
-    public String getHeader500() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("HTTP/1.1 500 Internal Server Error\r\n");
-        builder.append("\r\n");
-        return builder.toString();
     }
 
     private String getFormattedDate(Date date) {
