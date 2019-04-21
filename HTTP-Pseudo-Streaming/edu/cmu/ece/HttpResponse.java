@@ -4,11 +4,10 @@ import java.util.*;
 import java.io.*;
 
 public class HttpResponse {
-    boolean abTest = true;
     public String getHeader(boolean connect, int fileLen, int contentLen, String contentRange,
                             String uri, long lastModified) {
         StringBuilder builder = new StringBuilder();
-        if (abTest) {
+        if (VodServer.mode == 1) {
             builder.append("Connection: Keep-Alive\r\n");
         } else {
             builder.append("Connection: ").append(connect ? "Keep-Alive" : "Close").append("\r\n");
@@ -26,7 +25,7 @@ public class HttpResponse {
     public String getHeader404(boolean connect, int fileLen) {
         StringBuilder builder = new StringBuilder();
         builder.append("HTTP/1.1 404 Not Found\r\n");
-        if (abTest) {
+        if (VodServer.mode == 1) {
             builder.append("Connection: Keep-Alive\r\n");
         } else {
             builder.append("Connection: ").append(connect ? "Keep-Alive" : "Close").append("\r\n");
@@ -54,7 +53,7 @@ public class HttpResponse {
     public String getHeader500() {
         StringBuilder builder = new StringBuilder();
         builder.append("HTTP/1.1 500 Internal Server Error\r\n");
-        if (abTest) {
+        if (VodServer.mode == 1) {
             builder.append("Connection: Keep-Alive\r\n");
         } else {
             builder.append("Connection: Close\r\n");

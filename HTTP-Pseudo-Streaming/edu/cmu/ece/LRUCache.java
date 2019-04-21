@@ -2,23 +2,23 @@ package edu.cmu.ece;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class LRUCache<T> {
+public class LRUCache<T1, T2> {
     class Node {
         Node prev;
         Node next;
-        T val;
-        int key;
+        T1 key;
+        T2 val;
 
-        public Node(int key, T val) {
+        public Node(T1 key, T2 val) {
             this.key = key;
             this.val = val;
         }
     }
 
-    Node head = new Node(0,null);
-    Node tail = new Node(0,null);
+    Node head = new Node(null,null);
+    Node tail = new Node(null,null);
     int capacity;
-    Map<Integer, Node> map = new ConcurrentHashMap<>();
+    Map<T1, Node> map = new ConcurrentHashMap<>();
 
     public LRUCache(int capacity) {
         this.capacity = capacity;
@@ -26,16 +26,15 @@ public class LRUCache<T> {
         tail.prev = head;
     }
 
-    public T get(int key) {
+    public T2 get(T1 key) {
         Node node = map.get(key);
         if (node == null) return null;
         delete(node);
         insert(node);
         return node.val;
-
     }
 
-    public void put(int key, T value) {
+    public void put(T1 key, T2 value) {
         Node node = map.get(key);
         if (node != null) {
             node.val = value;

@@ -14,8 +14,8 @@ public class HttpServer implements Runnable {
     private BufferedOutputStream binaryOut = null;
     private boolean conn = true;
     private int transmission = 0; // number of transmission
-    private boolean verbose = true;
-
+    private boolean verbose = true; // request/response information
+    private boolean cacheVerbose = false; // cache information
     public HttpServer(Socket socket, int id) {
         clientSocket = socket;
         this.id = id;
@@ -34,6 +34,9 @@ public class HttpServer implements Runnable {
                 } else {
                     transmission += 1;
                     doit(inputLine);
+                    if (VodServer.mode == 2) {
+                        conn = false;
+                    }
                 }
             }
 
@@ -72,55 +75,71 @@ public class HttpServer implements Runnable {
                 conn = false;
             }
 
-            // obtain URI file
-            File file = new File(ROOT_DIR, request.get("uri"));
-            // 404 file not exist
-            if (!file.exists()) {
-                throw new FileNotFoundException();
-            }
-            // file exists
-            int fileLen = (int) file.length();
-            int rangeLow;
-            int rangeHigh;
+            // start
+            File file = null;
+            String uri = request.get("uri");
+            String range = request.get("range");
+            String key = uri + ((range == null) ? "null" : range);
+            int fileLen;
+            int contentLen;
+            long fileLastModified;
+            byte[] data;
             String header;
-            if (request.get("range") == null) { // 200 OK
-                header = "HTTP/1.1 200 OK\r\n";
-                rangeLow = 0;
-                rangeHigh = fileLen - 1;
-            } else { // 206 partial content
-                header = "HTTP/1.1 206 Partial content\r\n";
-                String range = request.get("range").split("=")[1];
-                int d = range.indexOf("-");
-                if (d + 1 == range.length()) { // 1-
-                    rangeLow = Integer.valueOf(range.substring(0, d));
-                    rangeHigh = fileLen - 1;
-                } else if (d == 0) { // -500
-                    rangeHigh = fileLen - 1;
-                    rangeLow = rangeHigh - Integer.valueOf(range.substring(d + 1)) + 1;
-                } else { // 1-499
-                    rangeLow = Integer.valueOf(range.substring(0, d));
-                    rangeHigh = Integer.valueOf(range.substring(d + 1));
+
+            if (VodServer.mode > 0 && VodServer.cache.get(key) != null) { // being cached
+                 WebFile obj = VodServer.cache.get(key);
+                 fileLen = obj.length;
+                 fileLastModified = obj.lastModified;
+                 int[] ranges = getRange(range, fileLen);
+                 header = getHeader(range, ranges, fileLen, uri, fileLastModified);
+                 data = VodServer.cache.get(key).data;
+                 contentLen = data.length;
+                 if (cacheVerbose) {
+                     System.out.println("Hit key: " + key);
+                 }
+            } else { // not being cached/not ab test mode
+                if (cacheVerbose) {
+                    System.out.println("Miss key: " + key);
+                }
+                file = new File(ROOT_DIR, request.get("uri"));
+                // 404 file not exist
+                if (!file.exists()) {
+                    throw new FileNotFoundException();
+                }
+                // file exists
+                fileLen = (int) file.length();
+                fileLastModified = file.lastModified();
+                int[] ranges = getRange(range, fileLen);
+                header = getHeader(range, ranges, fileLen, uri, fileLastModified);
+                contentLen = ranges[1] - ranges[0] + 1;
+                data = new byte[contentLen];
+                FileInputStream fileIn = null;
+                try {
+                    fileIn = new FileInputStream(file);
+                    fileIn.skip(ranges[0]);
+                    fileIn.read(data);
+                } finally {
+                    if (fileIn != null)
+                        fileIn.close();
+                }
+                if (VodServer.mode > 0 && fileLen < VodServer.MAX_OBJECT_SIZE) {
+                    WebFile fileToCache = new WebFile(fileLen, data, fileLastModified);
+                    VodServer.cache.put(key, fileToCache);
+                    if (cacheVerbose) {
+                        System.out.println("Cache the file.");
+                    }
                 }
             }
-            // write header
-            int contentLen = rangeHigh - rangeLow + 1;
-            String contentRange = rangeLow + "-" + rangeHigh;
-            header += response.getHeader(
-                    conn,
-                    fileLen,
-                    contentLen,
-                    contentRange,
-                    request.get("uri"),
-                    file.lastModified());
+
             textOut.write(header);
             textOut.flush();
             if (verbose) {
                 System.out.println(verbResponse + header);
+            } else {
+                System.out.println(header);
             }
 
             // write binary file data
-            byte[] data = new byte[contentLen];
-            readFromFile(data, file, rangeLow);
             binaryOut.write(data, 0, contentLen);
             binaryOut.flush();
 
@@ -146,20 +165,48 @@ public class HttpServer implements Runnable {
         }
     }
 
-    public void readFromFile(byte[] data, File file, int rangeLow) throws IOException {
-        FileInputStream fileIn = null;
-        try {
-            fileIn = new FileInputStream(file);
-            fileIn.skip(rangeLow);
-            fileIn.read(data);
-        } finally {
-            if (fileIn != null)
-                fileIn.close();
+    public int[] getRange(String range, int fileLen) {
+        int[] ranges = new int[2];
+        if (range == null) { // 200 OK
+            ranges[1] = fileLen - 1;
+        } else { // 206 partial content
+            range = range.split("=")[1];
+            int d = range.indexOf("-");
+            if (d + 1 == range.length()) { // 1-
+                ranges[0] = Integer.valueOf(range.substring(0, d));
+                ranges[1] = fileLen - 1;
+            } else if (d == 0) { // -500
+                ranges[1] = fileLen - 1;
+                ranges[0] = ranges[1] - Integer.valueOf(range.substring(d + 1)) + 1;
+            } else { // 1-499
+                ranges[0] = Integer.valueOf(range.substring(0, d));
+                ranges[1] = Integer.valueOf(range.substring(d + 1));
+            }
         }
+        return ranges;
     }
 
-    public void readFromCache() {
+    public String getHeader(String range, int[] ranges, int fileLen, String uri, long fileLastModified) {
+        int rangeLow = ranges[0];
+        int rangeHigh = ranges[1];
+        // write header
+        String header;
+        int contentLen = rangeHigh - rangeLow + 1;
+        String contentRange = rangeLow + "-" + rangeHigh;
 
+        if (range == null) {
+            header = "HTTP/1.1 200 OK\r\n";
+        } else {
+            header = "HTTP/1.1 206 Partial content\r\n";
+        }
+        header += response.getHeader(
+                conn,
+                fileLen,
+                contentLen,
+                contentRange,
+                uri,
+                fileLastModified);
+        return header;
     }
 
     public Map<String, String> parse(BufferedReader in, String requestLine) throws IOException {
@@ -218,8 +265,8 @@ public class HttpServer implements Runnable {
         } finally {
             VodServer.clients.remove(id);
             if (verbose) {
-                String str = String.format("========= Client %d Close (%d) ============\n", id, transmission);
-                System.out.println(str + "Current client number: " + VodServer.clients.size());
+//                String str = String.format("========= Client %d Close (%d) ============\n", id, transmission);
+//                System.out.println(str + "Current client number: " + VodServer.clients.size());
             }
         }
     }
