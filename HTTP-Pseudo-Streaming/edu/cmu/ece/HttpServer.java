@@ -6,7 +6,6 @@ import java.util.*;
 
 public class HttpServer implements Runnable {
     private static final File ROOT_DIR = new File("content");
-    private static final int MAX_BUF_SIZE = 1 << 10;
     private final int id;
     private Socket clientSocket;
     private HttpResponse response = new HttpResponse();
@@ -24,27 +23,25 @@ public class HttpServer implements Runnable {
 
     @Override
     public void run() {
-        while (conn) {
-            try {
-                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                textOut = new PrintWriter(clientSocket.getOutputStream(), true);
-                binaryOut = new BufferedOutputStream(clientSocket.getOutputStream());
-                String inputLine = null;
-                while ( (inputLine = in.readLine())!= null) {
+        try {
+            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            textOut = new PrintWriter(clientSocket.getOutputStream(), true);
+            binaryOut = new BufferedOutputStream(clientSocket.getOutputStream());
+            while (conn) {
+                String inputLine = in.readLine();
+                if ((inputLine) == null) {
+                    conn = false;
+                } else {
                     transmission += 1;
                     doit(inputLine);
                 }
-            } catch (IOException e) {
-                conn = false;
-                System.err.println(e.getMessage());
             }
+
+        } catch (IOException e) {
+            System.err.println(e.getMessage());
         }
-        cleanUp();
-        VodServer.clients.remove(id);
-        if (verbose) {
-            String str = String.format("========= Client %d Close (%d) ============", id, transmission);
-            System.out.println(str);
-        }
+
+        cleanUp(); // close the socket
     }
 
     private void doit(String requestLine) {
@@ -123,15 +120,7 @@ public class HttpServer implements Runnable {
 
             // write binary file data
             byte[] data = new byte[contentLen];
-            FileInputStream fileIn = null;
-            try {
-                fileIn = new FileInputStream(file);
-                fileIn.skip(rangeLow);
-                fileIn.read(data);
-            } finally {
-                if (fileIn != null)
-                    fileIn.close();
-            }
+            readFromFile(data, file, rangeLow);
             binaryOut.write(data, 0, contentLen);
             binaryOut.flush();
 
@@ -156,15 +145,21 @@ public class HttpServer implements Runnable {
             }
         }
     }
-    private int readFile(byte[] fileData, File file) throws IOException {
+
+    public void readFromFile(byte[] data, File file, int rangeLow) throws IOException {
         FileInputStream fileIn = null;
         try {
             fileIn = new FileInputStream(file);
-            return fileIn.read(fileData);
+            fileIn.skip(rangeLow);
+            fileIn.read(data);
         } finally {
             if (fileIn != null)
                 fileIn.close();
         }
+    }
+
+    public void readFromCache() {
+
     }
 
     public Map<String, String> parse(BufferedReader in, String requestLine) throws IOException {
@@ -220,7 +215,12 @@ public class HttpServer implements Runnable {
             clientSocket.close();
         } catch (IOException e) {
             System.err.println("Close stream error.");
+        } finally {
+            VodServer.clients.remove(id);
+            if (verbose) {
+                String str = String.format("========= Client %d Close (%d) ============\n", id, transmission);
+                System.out.println(str + "Current client number: " + VodServer.clients.size());
+            }
         }
     }
-
 }

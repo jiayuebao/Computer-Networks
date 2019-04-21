@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project name="Project3" default="compile" basedir=".">
+    <property name="src" value="edu/cmu/ece"/>
+    <property name="dest" value="."/>
+    <property name="project3_jar" value="project3.jar"/>
+
+    <target name="init">
+        <mkdir dir="${dest}"/>
+    </target>
+    <!--开始编辑-->
+    <target name="compile" depends="init">
+        <javac srcdir="${src}" destdir="${dest}"/>
+    </target>
+    <!--创建jar包-->
+    <!--<target name="build" depends="compile">-->
+        <!--<jar jarfile="${project3_jar}" basedir="${dest}"/>-->
+    <!--</target>-->
+    <!--&lt;!&ndash;开始运行&ndash;&gt;-->
+    <!--<target name="run" depends="build">-->
+        <!--<java classname="VodServer" classpath="${project3_jar}"/>-->
+    <!--</target>-->
+    <!--&lt;!&ndash;删除生成的文件&ndash;&gt;-->
+    <!--<target name="clean" depends="run">-->
+        <!--<delete dir="${dest}"/>-->
+        <!--<delete file="${project3_jar}"/>-->
+    <!--</target>-->
+    <!--<target name="rerun" depends="clean,run">-->
+        <!--<ant target="clean" />-->
+        <!--<ant target="run" />-->
+    <!--</target>-->
+
+</project>
