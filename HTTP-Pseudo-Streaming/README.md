@@ -1,4 +1,4 @@
-## Content Distribution Network
+## HTTP Pseudo Streaming
 ### How to execute
 simply run: 
 
