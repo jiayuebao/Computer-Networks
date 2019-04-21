@@ -3,8 +3,8 @@
 simply run: 
 
   ```
-  ant
-  java cmu.edu.ece.VodServer 8080
+  $ ant
+  $ java cmu.edu.ece.VodServer 8080
   ```
  
  Three modes to choose:
