@@ -14,8 +14,8 @@ public class HttpServer implements Runnable {
     private BufferedOutputStream binaryOut = null;
     private boolean conn = true;
     private int transmission = 0; // number of transmission
-    private boolean verbose = true; // request/response information
-    private boolean cacheVerbose = false; // cache information
+    private boolean verbose = true; // print request/response information
+    private boolean cacheVerbose = false; // print cache information
     public HttpServer(Socket socket, int id) {
         clientSocket = socket;
         this.id = id;
