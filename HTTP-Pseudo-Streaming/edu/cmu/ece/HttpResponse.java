@@ -1,9 +1,9 @@
 package edu.cmu.ece;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.io.*;
 
 public class HttpResponse {
+
     public String getHeader(boolean connect, int fileLen, int contentLen, String contentRange,
                             String uri, long lastModified) {
         StringBuilder builder = new StringBuilder();

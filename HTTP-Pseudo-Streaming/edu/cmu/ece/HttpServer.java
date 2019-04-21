@@ -265,8 +265,8 @@ public class HttpServer implements Runnable {
         } finally {
             VodServer.clients.remove(id);
             if (verbose) {
-//                String str = String.format("========= Client %d Close (%d) ============\n", id, transmission);
-//                System.out.println(str + "Current client number: " + VodServer.clients.size());
+                String str = String.format("========= Client %d Close (%d) ============\n", id, transmission);
+                System.out.println(str + "Current client number: " + VodServer.clients.size());
             }
         }
     }
